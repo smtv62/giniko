@@ -1,3 +1,4 @@
+```yaml
 name: Giniko Kanal Tarama
 
 on:
@@ -8,6 +9,7 @@ on:
 jobs:
   scan:
     runs-on: ubuntu-latest
+
     permissions:
       contents: write
 
@@ -20,7 +22,7 @@ jobs:
         with:
           python-version: '3.11'
 
-      - name: Bagımlılık Kur
+      - name: Bağımlılık Kur
         run: |
           python -m pip install --upgrade pip
           pip install requests
@@ -28,13 +30,24 @@ jobs:
       - name: Kanalları Tara
         run: python nilo.py
 
-      - name: Kanal sayısını kontrol et
+      - name: M3U Dosyasını Kontrol Et
         run: |
-          COUNT=$(python3 -c "import json; d=json.load(open('channels5.json')); print(len(d))")
+          if [ ! -f channels5.m3u ]; then
+            echo "HATA: channels5.m3u dosyası oluşturulmadı!"
+            exit 1
+          fi
+
+          COUNT=$(grep -c '^#EXTINF:' channels5.m3u || true)
+
           echo "Bulunan kanal: $COUNT"
-          # Eğer kanal sayısı 1'den azsa hata ver (Boş dosya koruması)
-          if (( COUNT < 1 )); then
-            echo "Kanal sayısı çok az ($COUNT), hata oluşmuş olabilir!"
+
+          if [ "$COUNT" -lt 1 ]; then
+            echo "HATA: Kanal sayısı sıfır veya dosya boş!"
+            exit 1
+          fi
+
+          if ! head -n 1 channels5.m3u | grep -q '^#EXTM3U'; then
+            echo "HATA: M3U başlığı geçersiz!"
             exit 1
           fi
 
@@ -42,5 +55,13 @@ jobs:
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
-          git add channels5.json
-          git diff --staged --quiet && echo "Degisiklik yok" || (git commit -m "Kanal tarama: $(date +'%Y-%m-%d')" && git push)
+
+          git add channels5.m3u
+
+          if git diff --staged --quiet; then
+            echo "Değişiklik yok"
+          else
+            git commit -m "Kanal tarama: $(date +'%Y-%m-%d')"
+            git push
+          fi
+```
